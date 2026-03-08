@@ -341,6 +341,44 @@ impl ClientOptions {
         Ok(rest::Rest::create(http_client, self, rest_url))
     }
 
+    /// Reconstruct a `ClientOptions` from a reference to an existing one.
+    ///
+    /// Used internally to create a copy for the realtime transport while
+    /// the original is consumed by the REST client.
+    pub(crate) fn from_rest_opts(other: &ClientOptions) -> Self {
+        Self {
+            credential: other.credential.clone(),
+            auth_method: other.auth_method.clone(),
+            auth_headers: other.auth_headers.clone(),
+            auth_params: other.auth_params.clone(),
+            tls: other.tls,
+            client_id: other.client_id.clone(),
+            use_token_auth: other.use_token_auth,
+            environment: other.environment.clone(),
+            idempotent_rest_publishing: other.idempotent_rest_publishing,
+            fallback_hosts: other.fallback_hosts.clone(),
+            format: other.format,
+            query_time: other.query_time,
+            default_token_params: other.default_token_params.clone(),
+            auto_connect: other.auto_connect,
+            rest_host: other.rest_host.clone(),
+            realtime_host: other.realtime_host.clone(),
+            port: other.port,
+            tls_port: other.tls_port,
+            disconnected_retry_timeout: other.disconnected_retry_timeout,
+            suspended_retry_timeout: other.suspended_retry_timeout,
+            channel_retry_timeout: other.channel_retry_timeout,
+            http_open_timeout: other.http_open_timeout,
+            http_request_timeout: other.http_request_timeout,
+            http_max_retry_count: other.http_max_retry_count,
+            http_max_retry_duration: other.http_max_retry_duration,
+            max_message_size: other.max_message_size,
+            max_frame_size: other.max_frame_size,
+            fallback_retry_timeout: other.fallback_retry_timeout,
+            add_request_ids: other.add_request_ids,
+        }
+    }
+
     pub fn token_source(token: Credential) -> Self {
         Self {
             credential: token,

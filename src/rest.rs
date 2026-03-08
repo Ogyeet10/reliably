@@ -607,7 +607,7 @@ pub enum Data {
 }
 
 impl Data {
-    fn is_none(&self) -> bool {
+    pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 }
@@ -665,7 +665,7 @@ impl From<serde_json::Value> for Data {
 
 /// The encoding of a message, which is either unset or is a list of data
 /// encodings separated by the '/' character.
-#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum Encoding {
     None,
@@ -673,7 +673,7 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    fn is_none(&self) -> bool {
+    pub fn is_none(&self) -> bool {
         match self {
             Self::None => true,
             Self::Some(_) => false,
@@ -811,7 +811,7 @@ pub struct PresenceMessage {
 }
 
 /// Iteratively decode the given data based on the given list of encodings.
-fn decode(data: &mut Data, encoding: &mut Encoding, opts: Option<&ChannelOptions>) {
+pub(crate) fn decode(data: &mut Data, encoding: &mut Encoding, opts: Option<&ChannelOptions>) {
     while let Some(enc) = encoding.pop() {
         *data = match decode_once(data, &enc, opts) {
             Ok(data) => data,

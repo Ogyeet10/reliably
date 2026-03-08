@@ -181,6 +181,18 @@ pub struct Error {
     pub cause: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
+impl Clone for Error {
+    fn clone(&self) -> Self {
+        Self {
+            code: self.code,
+            message: self.message.clone(),
+            status_code: self.status_code,
+            href: self.href.clone(),
+            cause: None, // cause is not cloneable
+        }
+    }
+}
+
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.cause.as_deref().map(|e| e as _)

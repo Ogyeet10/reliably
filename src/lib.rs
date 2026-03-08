@@ -24,12 +24,21 @@ pub mod http;
 mod json;
 pub mod options;
 pub mod presence;
+pub mod connection;
+pub mod protocol;
+pub mod realtime;
+pub mod realtime_channel;
+pub mod realtime_presence;
 pub mod rest;
+pub(crate) mod transport;
 pub mod stats;
 
 pub use error::{Error, Result};
 pub use options::ClientOptions;
 pub use rest::{Data, Rest};
+pub use realtime::Realtime;
+pub use connection::{Connection, ConnectionState, ConnectionStateChange};
+pub use realtime_channel::{Channels, RealtimeChannel, ChannelState, ChannelStateChange};
 
 // Ably-prefixed type aliases for convenience.
 /// Alias for [`Rest`] — the main Ably REST client.
@@ -51,8 +60,11 @@ mod tests {
 
     use super::*;
     use crate::auth::{AuthOptions, Credential, TokenParams};
+    use crate::connection::ConnectionState;
     use crate::error::ErrorCode;
     use crate::http::Method;
+    use crate::realtime::Realtime;
+    use crate::realtime_channel::ChannelState;
 
     #[test]
     fn rest_client_from_string_with_colon_sets_key() {
@@ -167,6 +179,28 @@ mod tests {
                 method: Default::default(),
                 params: None,
             }
+        }
+
+        /// Returns a Realtime client configured for the sandbox environment.
+        fn realtime_client(&self) -> Realtime {
+            let opts = self.options().use_binary_protocol(false);
+            Realtime::from_options(opts).expect("Expected realtime client to initialise")
+        }
+
+        /// Returns a Realtime client with auto_connect disabled.
+        fn realtime_client_no_connect(&self) -> Realtime {
+            let mut opts = self.options().use_binary_protocol(false);
+            opts.auto_connect = false;
+            Realtime::from_options(opts).expect("Expected realtime client to initialise")
+        }
+
+        /// Returns a Realtime client with a client_id set (required for presence).
+        fn realtime_client_with_id(&self, client_id: &str) -> Realtime {
+            let opts = self.options()
+                .use_binary_protocol(false)
+                .client_id(client_id)
+                .expect("Expected client_id to be valid");
+            Realtime::from_options(opts).expect("Expected realtime client to initialise")
         }
     }
 
@@ -870,6 +904,692 @@ mod tests {
             .await
             .expect("Expected REST request to succeed");
 
+        Ok(())
+    }
+
+    // ===================================================================
+    // Realtime tests
+    // ===================================================================
+
+    /// Timeout for connection/channel state waits in tests.
+    const STATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+    /// Timeout for receiving messages in tests.
+    const MSG_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+    #[tokio::test]
+    async fn realtime_connect() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        // Race-free: returns immediately if already connected.
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        assert_eq!(client.connection.state(), ConnectionState::Connected);
+
+        let id = client.connection.id().await;
+        assert!(id.is_some(), "Expected connection ID to be set");
+
+        let key = client.connection.key().await;
+        assert!(key.is_some(), "Expected connection key to be set");
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_connect_manual() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client_no_connect();
+
+        assert_eq!(client.connection.state(), ConnectionState::Initialized);
+
+        client.connection.connect();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+        assert_eq!(client.connection.state(), ConnectionState::Connected);
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_close() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        client.close().await;
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Closed, STATE_TIMEOUT)
+            .await?;
+        assert_eq!(client.connection.state(), ConnectionState::Closed);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_ping() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let rtt = client.connection.ping().await?;
+        assert!(
+            rtt.as_millis() < 10_000,
+            "Expected ping RTT under 10s, got {:?}",
+            rtt
+        );
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_channel_attach() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_attach").await;
+        assert_eq!(channel.state(), ChannelState::Initialized);
+
+        channel.attach().await?;
+        assert_eq!(channel.state(), ChannelState::Attached);
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_channel_detach() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_detach").await;
+        channel.attach().await?;
+        assert_eq!(channel.state(), ChannelState::Attached);
+
+        channel.detach().await?;
+        assert_eq!(channel.state(), ChannelState::Detached);
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_publish_subscribe() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_pubsub").await;
+        let mut sub = channel.subscribe().await?;
+
+        channel
+            .publish(Some("greeting"), Data::String("hello world".into()))
+            .await?;
+
+        let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+            .await
+            .expect("Timed out waiting for message")
+            .expect("Subscription channel closed");
+
+        assert_eq!(msg.name, Some("greeting".to_string()));
+        assert_eq!(msg.data, Data::String("hello world".to_string()));
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_publish_subscribe_json() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_pubsub_json").await;
+        let mut sub = channel.subscribe().await?;
+
+        let data = json!({"key": "value", "num": 42});
+        channel
+            .publish(Some("json_event"), Data::JSON(data.clone()))
+            .await?;
+
+        let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+            .await
+            .expect("Timed out waiting for message")
+            .expect("Subscription channel closed");
+
+        assert_eq!(msg.name, Some("json_event".to_string()));
+        assert_eq!(msg.data, Data::JSON(data));
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_publish_multiple() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_publish_multi").await;
+        let mut sub = channel.subscribe().await?;
+
+        for i in 0..3 {
+            channel
+                .publish(
+                    Some(&format!("event_{}", i)),
+                    Data::String(format!("data_{}", i)),
+                )
+                .await?;
+        }
+
+        let mut received = Vec::new();
+        for _ in 0..3 {
+            let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+                .await
+                .expect("Timed out waiting for message")
+                .expect("Subscription channel closed");
+            received.push(msg);
+        }
+
+        assert_eq!(received.len(), 3);
+        for (i, msg) in received.iter().enumerate() {
+            assert_eq!(msg.name, Some(format!("event_{}", i)));
+            assert_eq!(msg.data, Data::String(format!("data_{}", i)));
+        }
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_channel_state_changes() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_state_changes").await;
+
+        channel.attach().await?;
+        assert_eq!(channel.state(), ChannelState::Attached);
+
+        channel.detach().await?;
+        assert_eq!(channel.state(), ChannelState::Detached);
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_subscribe_auto_attaches() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_realtime_auto_attach").await;
+        assert_eq!(channel.state(), ChannelState::Initialized);
+
+        let _sub = channel.subscribe().await?;
+        assert_eq!(channel.state(), ChannelState::Attached);
+
+        client.close().await;
+        Ok(())
+    }
+
+    // ===================================================================
+    // Concurrent subscriber tests
+    // ===================================================================
+
+    #[tokio::test]
+    async fn realtime_multiple_subscribers_same_channel() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_multi_sub").await;
+
+        // Create 3 independent subscribers.
+        let mut sub1 = channel.subscribe().await?;
+        let mut sub2 = channel.subscribe().await?;
+        let mut sub3 = channel.subscribe().await?;
+
+        // Publish a single message.
+        channel
+            .publish(Some("event"), Data::String("broadcast".into()))
+            .await?;
+
+        // All 3 subscribers should receive the same message.
+        for (i, sub) in [&mut sub1, &mut sub2, &mut sub3].iter_mut().enumerate() {
+            let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+                .await
+                .unwrap_or_else(|_| panic!("Subscriber {} timed out", i + 1))
+                .unwrap_or_else(|| panic!("Subscriber {} channel closed", i + 1));
+
+            assert_eq!(msg.name, Some("event".to_string()));
+            assert_eq!(msg.data, Data::String("broadcast".to_string()));
+        }
+
+        client.close().await;
+        Ok(())
+    }
+
+    // ===================================================================
+    // High-throughput test
+    // ===================================================================
+
+    #[tokio::test]
+    async fn realtime_high_throughput_ordered_delivery() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_high_throughput").await;
+        let mut sub = channel.subscribe().await?;
+
+        let count = 20;
+
+        // Publish messages sequentially (each waits for ACK).
+        for i in 0..count {
+            channel
+                .publish(
+                    Some(&format!("msg_{}", i)),
+                    Data::String(format!("payload_{}", i)),
+                )
+                .await?;
+        }
+
+        // Receive all messages. Use a generous per-message timeout since
+        // messages echo back from the server.
+        let mut received = Vec::new();
+        for i in 0..count {
+            let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+                .await
+                .unwrap_or_else(|_| panic!(
+                    "Timed out waiting for message {}/{} (received {} so far)",
+                    i, count, received.len()
+                ))
+                .unwrap_or_else(|| panic!(
+                    "Subscription closed after receiving {}/{} messages",
+                    received.len(), count
+                ));
+            received.push(msg);
+        }
+
+        assert_eq!(received.len(), count);
+        for (i, msg) in received.iter().enumerate() {
+            assert_eq!(
+                msg.name,
+                Some(format!("msg_{}", i)),
+                "Message {} out of order",
+                i
+            );
+            assert_eq!(msg.data, Data::String(format!("payload_{}", i)));
+        }
+
+        client.close().await;
+        Ok(())
+    }
+
+    // ===================================================================
+    // Presence tests
+    // ===================================================================
+
+    #[tokio::test]
+    async fn realtime_presence_enter_leave() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client_with_id("test-user-1");
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_presence_enter_leave").await;
+        channel.attach().await?;
+
+        // Subscribe to presence events before entering.
+        let mut presence_sub = channel.presence.subscribe();
+
+        // Enter presence.
+        channel
+            .presence
+            .enter(Some(Data::String("online".into())))
+            .await?;
+
+        // Should receive the enter event.
+        let event = tokio::time::timeout(MSG_TIMEOUT, presence_sub.recv())
+            .await
+            .expect("Timed out waiting for presence enter event")
+            .expect("Presence subscription closed");
+
+        assert_eq!(event.client_id, "test-user-1");
+        assert!(
+            matches!(event.action, crate::rest::PresenceAction::Enter),
+            "Expected Enter action, got {:?}",
+            event.action
+        );
+
+        // Verify the member is in the presence set.
+        let members = channel.presence.get().await;
+        assert!(
+            members.iter().any(|m| m.client_id == "test-user-1"),
+            "Expected test-user-1 in presence set, got: {:?}",
+            members
+        );
+
+        // Leave presence.
+        channel.presence.leave(None).await?;
+
+        // Should receive the leave event.
+        let event = tokio::time::timeout(MSG_TIMEOUT, presence_sub.recv())
+            .await
+            .expect("Timed out waiting for presence leave event")
+            .expect("Presence subscription closed");
+
+        assert_eq!(event.client_id, "test-user-1");
+        assert!(
+            matches!(event.action, crate::rest::PresenceAction::Leave),
+            "Expected Leave action, got {:?}",
+            event.action
+        );
+
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_presence_update() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client_with_id("test-user-2");
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_presence_update").await;
+        channel.attach().await?;
+
+        let mut presence_sub = channel.presence.subscribe();
+
+        // Enter first.
+        channel
+            .presence
+            .enter(Some(Data::String("status: idle".into())))
+            .await?;
+
+        // Drain any events from enter and presence sync. Give a brief
+        // window for the sync protocol to complete.
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        while presence_sub.try_recv().is_ok() {}
+
+        // Update presence data.
+        channel
+            .presence
+            .update(Some(Data::String("status: active".into())))
+            .await?;
+
+        // Should receive the update event. The server may echo back as
+        // Update or Present depending on sync timing.
+        let event = tokio::time::timeout(MSG_TIMEOUT, presence_sub.recv())
+            .await
+            .expect("Timed out waiting for presence update event")
+            .expect("Presence subscription closed");
+
+        assert_eq!(event.client_id, "test-user-2");
+        assert!(
+            matches!(
+                event.action,
+                crate::rest::PresenceAction::Update | crate::rest::PresenceAction::Present
+            ),
+            "Expected Update or Present action, got {:?}",
+            event.action
+        );
+
+        // Leave.
+        channel.presence.leave(None).await?;
+        client.close().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn realtime_presence_get_members() -> Result<()> {
+        let app = TestApp::create().await?;
+
+        // Two clients join the same channel.
+        let client_a = app.realtime_client_with_id("user-a");
+        let client_b = app.realtime_client_with_id("user-b");
+
+        client_a
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+        client_b
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel_a = client_a.channels.get("test_presence_get").await;
+        let channel_b = client_b.channels.get("test_presence_get").await;
+
+        channel_a.attach().await?;
+        channel_b.attach().await?;
+
+        // Both enter.
+        channel_a
+            .presence
+            .enter(Some(Data::String("a-data".into())))
+            .await?;
+        channel_b
+            .presence
+            .enter(Some(Data::String("b-data".into())))
+            .await?;
+
+        // Give the server a moment to propagate presence to both channels.
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        // Channel A should see both members.
+        let members_a = channel_a.presence.get().await;
+        let ids_a: Vec<&str> = members_a.iter().map(|m| m.client_id.as_str()).collect();
+        assert!(
+            ids_a.contains(&"user-a") && ids_a.contains(&"user-b"),
+            "Expected both users in presence set on channel_a, got: {:?}",
+            ids_a
+        );
+
+        // Channel B should also see both members.
+        let members_b = channel_b.presence.get().await;
+        let ids_b: Vec<&str> = members_b.iter().map(|m| m.client_id.as_str()).collect();
+        assert!(
+            ids_b.contains(&"user-a") && ids_b.contains(&"user-b"),
+            "Expected both users in presence set on channel_b, got: {:?}",
+            ids_b
+        );
+
+        // Clean up.
+        channel_a.presence.leave(None).await?;
+        channel_b.presence.leave(None).await?;
+        client_a.close().await;
+        client_b.close().await;
+        Ok(())
+    }
+
+    // ===================================================================
+    // Discontinuity test
+    // ===================================================================
+
+    #[tokio::test]
+    async fn realtime_discontinuity_on_first_attach() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_discontinuity").await;
+
+        // Subscribe to discontinuity events BEFORE attaching.
+        let mut disc_rx = channel.on_discontinuity();
+
+        // Attach — first attach is always non-resumed, so a discontinuity
+        // event should fire (RTL18: fresh attach from attaching state).
+        channel.attach().await?;
+
+        // The discontinuity event should be emitted.
+        let event = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            disc_rx.recv(),
+        )
+        .await
+        .expect("Timed out waiting for discontinuity event")
+        .expect("Discontinuity subscription closed");
+
+        assert_eq!(event.current, ChannelState::Attached);
+        assert!(!event.resumed, "First attach should not be resumed");
+
+        client.close().await;
+        Ok(())
+    }
+
+    // ===================================================================
+    // Two-client pub/sub test (messages cross connections)
+    // ===================================================================
+
+    #[tokio::test]
+    async fn realtime_two_client_pubsub() -> Result<()> {
+        let app = TestApp::create().await?;
+        let publisher = app.realtime_client();
+        let subscriber = app.realtime_client();
+
+        publisher
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+        subscriber
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let pub_ch = publisher.channels.get("test_two_client").await;
+        let sub_ch = subscriber.channels.get("test_two_client").await;
+
+        let mut sub = sub_ch.subscribe().await?;
+        // Ensure the subscriber channel is attached before publishing.
+        sub_ch
+            .wait_for_state(ChannelState::Attached)
+            .await?;
+
+        // Publish from the publisher client.
+        pub_ch
+            .publish(Some("cross"), Data::String("from-another-client".into()))
+            .await?;
+
+        // Subscriber should receive it.
+        let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+            .await
+            .expect("Timed out waiting for cross-client message")
+            .expect("Subscription closed");
+
+        assert_eq!(msg.name, Some("cross".to_string()));
+        assert_eq!(
+            msg.data,
+            Data::String("from-another-client".to_string())
+        );
+
+        publisher.close().await;
+        subscriber.close().await;
+        Ok(())
+    }
+
+    // ===================================================================
+    // Binary data roundtrip
+    // ===================================================================
+
+    #[tokio::test]
+    async fn realtime_publish_subscribe_binary() -> Result<()> {
+        let app = TestApp::create().await?;
+        let client = app.realtime_client();
+
+        client
+            .connection
+            .wait_for_state_with_timeout(ConnectionState::Connected, STATE_TIMEOUT)
+            .await?;
+
+        let channel = client.channels.get("test_binary_pubsub").await;
+        let mut sub = channel.subscribe().await?;
+
+        let payload = serde_bytes::ByteBuf::from(vec![0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD]);
+        channel
+            .publish(Some("binary"), Data::Binary(payload.clone()))
+            .await?;
+
+        let msg = tokio::time::timeout(MSG_TIMEOUT, sub.recv())
+            .await
+            .expect("Timed out waiting for binary message")
+            .expect("Subscription closed");
+
+        assert_eq!(msg.name, Some("binary".to_string()));
+        assert_eq!(msg.data, Data::Binary(payload));
+
+        client.close().await;
         Ok(())
     }
 }
