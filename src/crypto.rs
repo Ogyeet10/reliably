@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use aes::cipher::block_padding::Pkcs7;
 use aes::cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use cipher::generic_array::GenericArray;
-use rand::{thread_rng, Rng, RngCore};
+use rand::{rng, Rng, RngCore};
 
 use crate::error::{Error, ErrorCode, Result};
 
@@ -92,7 +92,7 @@ impl CipherParamsBuilder {
                             .map_err(|_| Error::new(ErrorCode::BadRequest, "Invalid key size"))?
                     } else {
                         let mut data = [0; 16];
-                        thread_rng().fill_bytes(&mut data);
+                        rng().fill_bytes(&mut data);
                         data
                     };
 
@@ -104,7 +104,7 @@ impl CipherParamsBuilder {
                             .map_err(|_| Error::new(ErrorCode::BadRequest, "Invalid key size"))?
                     } else {
                         let mut data = [0; 32];
-                        thread_rng().fill_bytes(&mut data);
+                        rng().fill_bytes(&mut data);
                         data
                     };
                     CipherParams::Aes256Cbc(key)
@@ -157,7 +157,7 @@ impl CipherParams {
         // copy the data into the buffer.
         buf[..data.len()].copy_from_slice(data);
 
-        let iv = iv.unwrap_or_else(|| thread_rng().gen::<IV>().to_vec());
+        let iv = iv.unwrap_or_else(|| rng().random::<IV>().to_vec());
 
         // encrypt the data.
         let encrypted = self.encrypt_raw(&iv, &mut buf, data.len())?;

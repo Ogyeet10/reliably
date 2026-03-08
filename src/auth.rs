@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 use hmac::{Hmac, Mac};
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
@@ -350,7 +350,7 @@ impl<'a> Auth<'a> {
 
     /// Generate a random 16 character nonce to use in a TokenRequest.
     fn generate_nonce() -> String {
-        thread_rng()
+        rng()
             .sample_iter(&Alphanumeric)
             .take(16)
             .map(char::from)

@@ -25,7 +25,7 @@ futures = "0.3.21"
 hmac = "0.12.1"
 lazy_static = "1.4.0"
 mime = "0.3.16"
-rand = "0.8.5"
+rand = "0.9"
 regex = "1.5.5"
 reqwest = { version = "0.13.2", features = ["json", "query", "native-tls"] }
 rmp-serde = "1.1.0"

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use lazy_static::lazy_static;
 use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::rng;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -253,7 +253,7 @@ impl Rest {
 
         // Create a randomised list of fallback hosts if they're set.
         let mut hosts = self.inner.opts.fallback_hosts.clone();
-        hosts.shuffle(&mut thread_rng());
+        hosts.shuffle(&mut rng());
 
         // Try sending the request to the fallback hosts, capped at
         // ClientOptions.httpMaxRetryCount.
