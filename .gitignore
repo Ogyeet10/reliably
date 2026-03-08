@@ -5,3 +5,4 @@
 /target
 Cargo.lock
 ably-js-ref/
+ably-js-ref/ably-js/LICENSE
