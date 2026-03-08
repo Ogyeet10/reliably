@@ -329,7 +329,8 @@ impl ClientOptions {
         default_headers.insert("X-Ably-Version", http::HeaderValue::from_static("1.2"));
 
         if let Some(client_id) = &self.client_id {
-            default_headers.insert("X-Ably-ClientId", base64::encode(client_id).parse()?);
+            use base64::{engine::general_purpose::STANDARD, Engine};
+            default_headers.insert("X-Ably-ClientId", STANDARD.encode(client_id).parse()?);
         }
 
         let http_client = reqwest::Client::builder()

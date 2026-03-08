@@ -1,6 +1,6 @@
 [package]
 name = "reliably"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "A fully-featured real-time Rust client for Ably"
 documentation = "https://docs.rs/reliably"
@@ -17,8 +17,7 @@ include = [
 
 [dependencies]
 aes = "0.8.1"
-atty = "0.2.14"
-base64 = "0.13.0"
+base64 = "0.22.1"
 block-modes = "0.9.1"
 cipher = "0.4.3"
 chrono = { version = "0.4.19", features = ["serde"] }
@@ -28,7 +27,7 @@ lazy_static = "1.4.0"
 mime = "0.3.16"
 rand = "0.8.5"
 regex = "1.5.5"
-reqwest = { version = "0.11.10", features = ["json"] }
+reqwest = { version = "0.13.2", features = ["json", "query", "native-tls"] }
 rmp-serde = "1.1.0"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_bytes = "0.11.6"
@@ -38,14 +37,14 @@ sha2 = "0.10.2"
 url = "2.2.2"
 cbc = "0.1.2"
 num-traits = "0.2.15"
-num-derive = "0.3.3"
+num-derive = "0.4.2"
 tokio = { version = "1.18.2", features = ["rt", "net", "time", "sync", "macros"] }
-tokio-tungstenite = { version = "0.17.2", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.28.0", features = ["native-tls"] }
 
 [dev-dependencies]
 tokio = { version = "1.18.2", features = ["full"] }
 
 [features]
-native-tls-alpn = ["reqwest/native-tls-alpn", "tokio-tungstenite/native-tls"]
+native-tls = ["reqwest/native-tls", "tokio-tungstenite/native-tls"]
 rustls = ["reqwest/rustls", "tokio-tungstenite/__rustls-tls"]
-default = ["reqwest/native-tls-alpn"]
+default = ["native-tls"]

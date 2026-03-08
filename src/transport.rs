@@ -218,11 +218,11 @@ fn serialize_frame(
     match format {
         Format::JSON => {
             let json = serde_json::to_string(pm)?;
-            Ok(tungstenite::Message::Text(json))
+            Ok(tungstenite::Message::Text(json.into()))
         }
         Format::MessagePack => {
             let bytes = rmp_serde::to_vec_named(pm)?;
-            Ok(tungstenite::Message::Binary(bytes))
+            Ok(tungstenite::Message::Binary(bytes.into()))
         }
     }
 }
@@ -237,7 +237,7 @@ fn deserialize_frame(
         }
         tungstenite::Message::Binary(bytes) => {
             Some(
-                rmp_serde::from_read::<_, ProtocolMessage>(bytes.as_slice())
+                rmp_serde::from_read::<_, ProtocolMessage>(&bytes[..])
                     .map_err(Into::into),
             )
         }

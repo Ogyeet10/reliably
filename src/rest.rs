@@ -789,7 +789,8 @@ impl Message {
         // If we have binary data but JSON format, base64 encode the data.
         if let Data::Binary(data) = &self.data {
             if format.is_json() {
-                self.data = base64::encode(data).into();
+                use base64::{Engine, engine::general_purpose::STANDARD};
+                self.data = STANDARD.encode(data).into();
                 self.encoding.push("base64");
             }
         };
@@ -859,7 +860,10 @@ fn decode_once(data: &mut Data, encoding: &str, opts: Option<&ChannelOptions>) -
             )),
         },
         "base64" => match data {
-            Data::String(s) => base64::decode(s).map(Into::into).map_err(Into::into),
+            Data::String(s) => {
+                use base64::{Engine, engine::general_purpose::STANDARD};
+                STANDARD.decode(s).map(Into::into).map_err(Into::into)
+            }
             _ => Err(Error::new(
                 ErrorCode::InvalidMessageDataOrEncoding,
                 "invalid base64 message data",

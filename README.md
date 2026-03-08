@@ -46,7 +46,7 @@ Add `reliably` and `tokio` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-reliably = "0.2.0"
+reliably = "0.3.0"
 tokio = { version = "1", features = ["full"] }
 ```
 

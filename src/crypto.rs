@@ -64,7 +64,8 @@ impl CipherParamsBuilder {
     }
 
     pub fn string(mut self, key: &str) -> Result<Self> {
-        let key = base64::decode(key)?;
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        let key = STANDARD.decode(key)?;
         self.key = Some(key);
         Ok(self)
     }
@@ -310,14 +311,16 @@ mod tests {
         }
 
         fn cipher(&self) -> CipherParams {
-            base64::decode(&self.key)
+            use base64::{Engine, engine::general_purpose::STANDARD};
+            STANDARD.decode(&self.key)
                 .expect("Expected base64 encoded cipher key")
                 .try_into()
                 .unwrap()
         }
 
         fn cipher_iv(&self) -> Vec<u8> {
-            base64::decode(&self.iv).expect("Expected base64 encoded IV")
+            use base64::{Engine, engine::general_purpose::STANDARD};
+            STANDARD.decode(&self.iv).expect("Expected base64 encoded IV")
         }
     }
 

@@ -334,7 +334,8 @@ impl<'a> Auth<'a> {
     }
 
     fn set_basic_auth(req: &mut reqwest::Request, key: &Key) -> Result<()> {
-        let encoded = base64::encode(format!("{}:{}", key.name, key.value));
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        let encoded = STANDARD.encode(format!("{}:{}", key.name, key.value));
         Self::set_header(
             req,
             reqwest::header::AUTHORIZATION,
@@ -390,7 +391,8 @@ impl<'a> Auth<'a> {
         mac.update(nonce.as_bytes());
         mac.update(b"\n");
 
-        Ok(base64::encode(mac.finalize().into_bytes()))
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        Ok(STANDARD.encode(mac.finalize().into_bytes()))
     }
 }
 
