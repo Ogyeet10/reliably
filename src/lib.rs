@@ -1,8 +1,18 @@
-//! A Rust client for the [Ably] REST and Realtime APIs.
+//! A fully-featured real-time Rust client for [Ably].
 //!
 //! # Example
 //!
-//! TODO
+//! ```rust,no_run
+//! use reliably::{AblyClient, Result};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<()> {
+//!     let client = AblyClient::new("<api_key>")?;
+//!     let channel = client.channels().get("my-channel");
+//!     channel.publish().string("hello").send().await?;
+//!     Ok(())
+//! }
+//! ```
 //!
 //! [Ably]: https://ably.com
 
@@ -20,6 +30,12 @@ pub mod stats;
 pub use error::{Error, Result};
 pub use options::ClientOptions;
 pub use rest::{Data, Rest};
+
+// Ably-prefixed type aliases for convenience.
+/// Alias for [`Rest`] — the main Ably REST client.
+pub type AblyClient = Rest;
+/// Alias for [`ClientOptions`] — configuration for the Ably client.
+pub type AblyClientOptions = ClientOptions;
 
 #[cfg(test)]
 mod tests {

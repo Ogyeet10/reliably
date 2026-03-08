@@ -2,13 +2,13 @@ use std::env;
 
 use futures::StreamExt;
 
-use ably::Result;
+use reliably::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let key = env::var("ABLY_API_KEY").expect("ABLY_API_KEY env var must be set");
 
-    let client = ably::Rest::new(&key)?;
+    let client = reliably::Rest::new(&key)?;
 
     let channel = client.channels().get("rust-example");
 

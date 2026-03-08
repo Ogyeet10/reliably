@@ -147,8 +147,8 @@ impl ClientOptions {
     /// # Example
     ///
     /// ```
-    /// # fn main() -> ably::Result<()> {
-    /// let client = ably::ClientOptions::new("aaaaaa.bbbbbb:cccccc").rest()?;
+    /// # fn main() -> reliably::Result<()> {
+    /// let client = reliably::ClientOptions::new("aaaaaa.bbbbbb:cccccc").rest()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -190,8 +190,8 @@ impl ClientOptions {
     /// # Example
     ///
     /// ```
-    /// # fn main() -> ably::Result<()> {
-    /// let client = ably::ClientOptions::new("aaaaaa.bbbbbb:cccccc")
+    /// # fn main() -> reliably::Result<()> {
+    /// let client = reliably::ClientOptions::new("aaaaaa.bbbbbb:cccccc")
     ///     .environment("sandbox")?
     ///     .rest()?;
     /// # Ok(())
@@ -254,8 +254,8 @@ impl ClientOptions {
     /// # Example
     ///
     /// ```
-    /// # fn main() -> ably::Result<()> {
-    /// let client = ably::ClientOptions::new("aaaaaa.bbbbbb:cccccc")
+    /// # fn main() -> reliably::Result<()> {
+    /// let client = reliably::ClientOptions::new("aaaaaa.bbbbbb:cccccc")
     ///     .rest_host("sandbox-rest.ably.io")?
     ///     .rest()?;
     /// # Ok(())

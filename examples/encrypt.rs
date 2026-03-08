@@ -2,17 +2,17 @@ use std::env;
 
 use futures::StreamExt;
 
-use ably::{error::ErrorCode, Error, Result};
+use reliably::{error::ErrorCode, Error, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let key = env::var("ABLY_API_KEY").expect("ABLY_API_KEY env var must be set");
 
-    let client = ably::Rest::new(&key)?;
+    let client = reliably::Rest::new(&key)?;
 
     // Initialize a channel with cipher parameters so that published messages
     // get encrypted.
-    let cipher = ably::crypto::CipherParams::default();
+    let cipher = reliably::crypto::CipherParams::default();
     let channel = client
         .channels()
         .name("rust-example")
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     // Retrieve the message from history using another client which doesn't
     // have the cipher params.
-    let client = ably::Rest::new(&key)?;
+    let client = reliably::Rest::new(&key)?;
     let channel = client.channels().name("rust-example").get();
     let page = channel.history().pages().next().await.unwrap()?;
     let msg = page.items().await?.pop().expect("Expected a message");
@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
     // published.
     println!("Decrypting the data");
     let mut data = match msg.data {
-        ably::Data::Binary(data) => data.into_vec(),
+        reliably::Data::Binary(data) => data.into_vec(),
         _ => return Err(Error::new(ErrorCode::BadRequest, "Expected binary data")),
     };
     let decrypted = cipher.decrypt(&mut data)?;

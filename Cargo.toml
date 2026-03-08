@@ -1,14 +1,13 @@
 [package]
-name = "ably"
+name = "reliably"
 version = "0.2.0"
 edition = "2021"
-description = "Ably client library SDK"
-documentation = "https://docs.rs/ably"
+description = "A fully-featured real-time Rust client for Ably"
+documentation = "https://docs.rs/reliably"
 readme = "README.md"
-homepage = "https://ably.com"
-repository = "https://github.com/ably/ably-rust"
+repository = "https://github.com/Ogyeet10/reliably"
 license = "Apache-2.0"
-keywords = ["ably", "realtime", "pubsub"]
+keywords = ["ably", "reliably", "realtime", "pubsub"]
 
 include = [
   "Cargo.toml",

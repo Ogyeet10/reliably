@@ -118,7 +118,7 @@ impl TryFrom<&str> for Key {
     ///
     /// ```
     /// use std::convert::TryFrom;
-    /// use ably::auth;
+    /// use reliably::auth;
     ///
     /// let res = auth::Key::try_from("ABC123.DEF456:XXXXXXXXXXXX");
     /// assert!(res.is_ok());
@@ -138,9 +138,9 @@ impl Key {
     /// # Example
     ///
     /// ```
-    /// # async fn run() -> ably::Result<()> {
+    /// # async fn run() -> reliably::Result<()> {
     /// use std::convert::TryFrom;
-    /// use ably::auth;
+    /// use reliably::auth;
     ///
     /// let key = auth::Key::try_from("ABC123.DEF456:XXXXXXXXXXXX").unwrap();
     ///

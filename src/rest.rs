@@ -73,10 +73,10 @@ impl Rest {
     /// # Example
     ///
     /// ```
-    /// # async fn run() -> ably::Result<()> {
-    /// use ably::stats::Stats;
+    /// # async fn run() -> reliably::Result<()> {
+    /// use reliably::stats::Stats;
     ///
-    /// let client = ably::Rest::from("<api_key>");
+    /// let client = reliably::Rest::from("<api_key>");
     ///
     /// let res = client
     ///     .stats()
@@ -98,8 +98,8 @@ impl Rest {
     /// # Example
     ///
     /// ```
-    /// # async fn run() -> ably::Result<()> {
-    /// let client = ably::Rest::from("<api_key>");
+    /// # async fn run() -> reliably::Result<()> {
+    /// let client = reliably::Rest::from("<api_key>");
     ///
     /// let time = client.time().await?;
     /// # Ok(())
@@ -133,10 +133,10 @@ impl Rest {
     /// # Example
     ///
     /// ```
-    /// # async fn run() -> ably::Result<()> {
-    /// use ably::http::{HeaderMap,Method};
+    /// # async fn run() -> reliably::Result<()> {
+    /// use reliably::http::{HeaderMap,Method};
     ///
-    /// let client = ably::Rest::from("<api_key>");
+    /// let client = reliably::Rest::from("<api_key>");
     ///
     /// let mut headers = HeaderMap::new();
     /// headers.insert("Foo", "Bar".parse().unwrap());
@@ -183,11 +183,11 @@ impl Rest {
     /// # Example
     ///
     /// ```
-    /// # async fn run() -> ably::Result<()> {
+    /// # async fn run() -> reliably::Result<()> {
     /// use futures::TryStreamExt;
-    /// use ably::http::Method;
+    /// use reliably::http::Method;
     ///
-    /// let client = ably::Rest::from("<api_key>");
+    /// let client = reliably::Rest::from("<api_key>");
     ///
     /// let mut pages = client
     ///     .paginated_request::<String>(Method::GET, "/time")
@@ -338,12 +338,12 @@ impl From<&str> for Rest {
     ///
     /// ```
     /// // Initialise a Rest client with an API key.
-    /// let client = ably::Rest::from("<api_key>");
+    /// let client = reliably::Rest::from("<api_key>");
     /// ```
     ///
     /// ```
     /// // Initialise a Rest client with a token.
-    /// let client = ably::Rest::from("<token>");
+    /// let client = reliably::Rest::from("<token>");
     /// ```
     fn from(s: &str) -> Self {
         // unwrap the result since we're guaranteed to have a valid client when
