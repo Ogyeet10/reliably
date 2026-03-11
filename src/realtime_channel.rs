@@ -293,9 +293,9 @@ impl RealtimeChannel {
     /// decoded [`Message`] values. Each subscriber gets its own independent
     /// stream — no message drops regardless of subscriber speed.
     pub async fn subscribe(&self) -> Result<mpsc::UnboundedReceiver<Arc<Message>>> {
-        self.ensure_attached().await?;
         let (tx, rx) = mpsc::unbounded_channel();
         self.message_subs.lock().unwrap().push(tx);
+        self.ensure_attached().await?;
         Ok(rx)
     }
 
