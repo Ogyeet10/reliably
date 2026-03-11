@@ -118,6 +118,7 @@ pub(crate) struct SharedState {
     pub state: ConnectionState,
     pub connection_id: Option<String>,
     pub connection_key: Option<String>,
+    pub connect_attempt_id: u64,
     /// The client ID — set from ClientOptions initially, may be updated by
     /// the server in ConnectionDetails on CONNECTED.
     pub client_id: Option<String>,
@@ -291,6 +292,7 @@ pub(crate) struct ConnectionManager {
     // Timer state
     retry_count: u32,
     suspend_start: Option<Instant>,
+    connect_attempt_id: u64,
 
     // Idle/heartbeat timeout
     /// Effective max idle interval = server's maxIdleInterval + request timeout.
@@ -321,6 +323,7 @@ impl ConnectionManager {
             state: ConnectionState::Initialized,
             connection_id: None,
             connection_key: None,
+            connect_attempt_id: 0,
             client_id: opts.client_id.clone(),
         }));
 
@@ -352,6 +355,7 @@ impl ConnectionManager {
             state_watch_tx,
             retry_count: 0,
             suspend_start: None,
+            connect_attempt_id: 0,
             max_idle_interval: None,
             last_activity: Instant::now(),
         };
@@ -898,6 +902,13 @@ impl ConnectionManager {
             self.suspend_start = Some(Instant::now());
         }
 
+        self.connect_attempt_id += 1;
+        let connect_attempt_id = self.connect_attempt_id;
+        {
+            let mut shared = self.shared.write().await;
+            shared.connect_attempt_id = connect_attempt_id;
+        }
+
         // Check connection state freshness before attempting resume.
         // If last activity is too old, discard connection state.
         self.check_connection_state_freshness();
@@ -914,15 +925,21 @@ impl ConnectionManager {
                 // Now we wait for a CONNECTED protocol message.
                 // Set a connection timeout.
                 let timeout_tx = self.transport_event_tx.clone();
+                let shared = self.shared.clone();
                 let timeout_duration = Duration::from_secs(20); // connectingTimeout
                 tokio::spawn(async move {
                     tokio::time::sleep(timeout_duration).await;
-                    let _ = timeout_tx
-                        .send(TransportEvent::Disconnected(Some(Error::new(
-                            ErrorCode::ConnectionTimedOut,
-                            "Connection timed out",
-                        ))))
-                        .await;
+                    let shared = shared.read().await;
+                    if shared.state == ConnectionState::Connecting
+                        && shared.connect_attempt_id == connect_attempt_id
+                    {
+                        let _ = timeout_tx
+                            .send(TransportEvent::Disconnected(Some(Error::new(
+                                ErrorCode::ConnectionTimedOut,
+                                "Connection timed out",
+                            ))))
+                            .await;
+                    }
                 });
             }
             Err(err) => {
