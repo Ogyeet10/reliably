@@ -1,6 +1,6 @@
 [package]
 name = "reliably"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 description = "A fully-featured real-time Rust client for Ably"
 documentation = "https://docs.rs/reliably"

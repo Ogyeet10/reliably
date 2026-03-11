@@ -137,7 +137,7 @@ impl RealtimeChannel {
                 state: ChannelState::Initialized,
                 properties: ChannelProperties::default(),
                 options,
-                modes: flags::MODE_ALL,
+                modes: 0,
                 was_attached: false,
                 channel_retry_timeout,
             })),
@@ -629,13 +629,18 @@ impl RealtimeChannel {
         let mut pm = ProtocolMessage::new(Action::Attach);
         pm.channel = Some(self.name.clone());
 
+        // Mirror ably-js: only include channel modes if explicitly set, and
+        // include the latest channel serial whenever we have one.
+        pm.channel_serial = inner.properties.channel_serial.clone();
+
         // Set channel modes.
-        pm.set_flag(inner.modes);
+        if inner.modes != 0 {
+            pm.set_flag(inner.modes);
+        }
 
         // If we were previously attached, request resume.
         if inner.was_attached {
             pm.set_flag(flags::ATTACH_RESUME);
-            pm.channel_serial = inner.properties.channel_serial.clone();
         }
 
         drop(inner);
