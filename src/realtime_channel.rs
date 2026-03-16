@@ -187,12 +187,6 @@ impl RealtimeChannel {
             let inner = self.inner.read().await;
             match inner.state {
                 ChannelState::Attached => return Ok(()),
-                ChannelState::Failed => {
-                    return Err(Error::new(
-                        ErrorCode::ChannelOperationFailedInvalidChannelState,
-                        "Channel is in failed state",
-                    ));
-                }
                 _ => {}
             }
         }
@@ -659,7 +653,8 @@ impl RealtimeChannel {
             ChannelState::Attached => Ok(()),
             ChannelState::Initialized
             | ChannelState::Detached
-            | ChannelState::Suspended => {
+            | ChannelState::Suspended
+            | ChannelState::Failed => {
                 // Auto-attach.
                 self.attach().await
             }
@@ -667,10 +662,6 @@ impl RealtimeChannel {
                 // Wait for it.
                 self.wait_for_attach().await
             }
-            ChannelState::Failed => Err(Error::new(
-                ErrorCode::ChannelOperationFailedInvalidChannelState,
-                "Channel is in failed state",
-            )),
             ChannelState::Detaching => {
                 // Wait for detach then re-attach.
                 let _ = self.wait_for_detach().await;
