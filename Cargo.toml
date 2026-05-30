@@ -1,6 +1,6 @@
 [package]
 name = "reliably"
-version = "0.3.6"
+version = "0.3.7"
 edition = "2021"
 description = "A fully-featured real-time Rust SDK for Ably pubsub"
 documentation = "https://docs.rs/reliably"
@@ -19,6 +19,7 @@ include = [
   "/LICENSE",
   "/README.md",
   "/src/**",
+  "/examples/**"
 ]
 
 [dependencies]
