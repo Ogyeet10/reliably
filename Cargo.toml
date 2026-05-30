@@ -19,6 +19,11 @@ include = [
   "LICENSE",
   "src/**/*",
 ]
+exclude = [
+  "ably-js-ref/**",
+  "submodules/**",
+  "Cargo.toml.orig",
+]
 
 [dependencies]
 aes = "0.8.1"
