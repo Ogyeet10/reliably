@@ -2,7 +2,7 @@
 name = "reliably"
 version = "0.3.5"
 edition = "2021"
-description = "A fully-featured real-time Rust SDK for Ably real-time messaging"
+description = "A fully-featured real-time Rust SDK for Ably pubsub"
 documentation = "https://docs.rs/reliably"
 readme = "README.md"
 repository = "https://github.com/Ogyeet10/reliably"
