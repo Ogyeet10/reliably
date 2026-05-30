@@ -38,11 +38,11 @@ pub struct Rest {
 }
 
 impl Rest {
-    pub fn auth(&self) -> Auth {
+    pub fn auth(&self) -> Auth<'_> {
         Auth { rest: self }
     }
 
-    pub fn channels(&self) -> Channels {
+    pub fn channels(&self) -> Channels<'_> {
         Channels { rest: self }
     }
 
@@ -89,7 +89,7 @@ impl Rest {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn stats(&self) -> http::PaginatedRequestBuilder<stats::Stats> {
+    pub fn stats(&self) -> http::PaginatedRequestBuilder<'_, stats::Stats> {
         self.paginated_request_with_options(http::Method::GET, "/stats", ())
     }
 
@@ -157,7 +157,7 @@ impl Rest {
     /// Returns an error if sending the request fails or if the resulting
     /// response is unsuccessful (i.e. the status code is not in the 200-299
     /// range).
-    pub fn request(&self, method: http::Method, path: &str) -> http::RequestBuilder {
+    pub fn request(&self, method: http::Method, path: &str) -> http::RequestBuilder<'_> {
         let mut url = self.inner.url.clone();
         url.set_path(path);
         self.request_url(method, url)
@@ -167,7 +167,7 @@ impl Rest {
         &self,
         method: http::Method,
         url: impl reqwest::IntoUrl,
-    ) -> http::RequestBuilder {
+    ) -> http::RequestBuilder<'_> {
         http::RequestBuilder::new(
             self,
             self.inner.reqwest.request(method, url),
@@ -214,7 +214,7 @@ impl Rest {
         method: http::Method,
         path: &str,
         options: T::Options,
-    ) -> http::PaginatedRequestBuilder<T> {
+    ) -> http::PaginatedRequestBuilder<'a, T> {
         http::PaginatedRequestBuilder::new(self.request(method, path), options)
     }
 
@@ -222,7 +222,7 @@ impl Rest {
         &'a self,
         method: http::Method,
         path: &str,
-    ) -> http::PaginatedRequestBuilder<DecodeRaw<T>> {
+    ) -> http::PaginatedRequestBuilder<'a, DecodeRaw<T>> {
         self.paginated_request_with_options(method, path, ())
     }
 
@@ -427,7 +427,7 @@ pub struct Channel<'a> {
 
 impl<'a> Channel<'a> {
     /// Start building a request to publish a message on the channel.
-    pub fn publish(&self) -> PublishBuilder {
+    pub fn publish(&self) -> PublishBuilder<'_> {
         let mut builder = PublishBuilder::new(self.rest, self.name.clone());
 
         if let Some(opts) = &self.opts {
@@ -443,7 +443,7 @@ impl<'a> Channel<'a> {
     ///
     /// Returns a history::RequestBuilder which is used to set parameters
     /// before sending the history request.
-    pub fn history(&self) -> PaginatedRequestBuilder<Message> {
+    pub fn history(&self) -> PaginatedRequestBuilder<'_, Message> {
         self.rest.paginated_request_with_options(
             http::Method::GET,
             &format!("/channels/{}/history", self.name),
@@ -464,7 +464,7 @@ impl<'a> Presence<'a> {
     }
 
     /// Start building a presence request for the channel.
-    pub fn get(&self) -> presence::RequestBuilder {
+    pub fn get(&self) -> presence::RequestBuilder<'_> {
         let req = self.rest.paginated_request_with_options(
             http::Method::GET,
             &format!("/channels/{}/presence", self.name),
@@ -477,7 +477,7 @@ impl<'a> Presence<'a> {
     ///
     /// Returns a history::RequestBuilder which is used to set parameters
     /// before sending the history request.
-    pub fn history(&self) -> PaginatedRequestBuilder<PresenceMessage> {
+    pub fn history(&self) -> PaginatedRequestBuilder<'_, PresenceMessage> {
         self.rest.paginated_request_with_options(
             http::Method::GET,
             &format!("/channels/{}/presence/history", self.name),
