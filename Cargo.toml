@@ -15,10 +15,10 @@ categories = [
     "asynchronous"
 ]
 include = [
-  "Cargo.toml",
-  "LICENSE",
-  "README.md",
-  "src/**",
+  "/Cargo.toml",
+  "/LICENSE",
+  "/README.md",
+  "/src/**",
 ]
 
 [dependencies]
