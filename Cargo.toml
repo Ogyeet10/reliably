@@ -17,12 +17,8 @@ categories = [
 include = [
   "Cargo.toml",
   "LICENSE",
-  "src/**/*",
-]
-exclude = [
-  "ably-js-ref/**",
-  "submodules/**",
-  "Cargo.toml.orig",
+  "README.md",
+  "src/**",
 ]
 
 [dependencies]
