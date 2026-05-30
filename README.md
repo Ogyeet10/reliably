@@ -1,30 +1,27 @@
 # Reliably
 
-A Rust client for [Ably](https://www.ably.com) with full REST and Realtime (Pub/Sub) support.
+A Rust SDK for [Ably](https://www.ably.com) with full REST and Realtime (Pub/Sub) support.
 
-_[Ably](https://ably.com) is the platform that powers synchronized digital experiences in realtime. For more information, see the [Ably documentation](https://ably.com/documentation)._
+This is a community-maintained fork of the original [ably-rust](https://github.com/ably/ably-rust) client, which only supported the REST API. This fork adds the Realtime (WebSocket) layer alongside some other useful changes.
 
-This is a community-maintained fork of the original [ably-rust](https://github.com/ably/ably-rust) SDK, which only supported the REST API. This fork adds the complete Realtime (WebSocket) layer: persistent connections, channels with attach/detach, publish/subscribe, presence, and connection/channel state machines with automatic recovery.
+## Installation
+
+Add `reliably` and `tokio` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+reliably = "0.3.6"
+tokio = { version = "1", features = ["full"] }
+```
 
 ## Features
 
-### REST API
-- Publish messages (string, JSON, binary)
-- Retrieve message history with pagination
-- Presence: get current members, history
-- Token authentication (request tokens, sign token requests)
-- Application statistics
-- Message encryption (AES-128/AES-256)
-
 ### Realtime (Pub/Sub)
 - Persistent WebSocket connection with automatic reconnection
-- Connection state machine (initialized, connecting, connected, disconnected, suspended, closing, closed, failed)
+- Connection state management (initialized, connecting, connected, disconnected, suspended, closing, closed, failed)
 - Channel state machine (initialized, attaching, attached, detaching, detached, suspended, failed)
-- Publish with server ACK
-- Subscribe with zero-message-loss delivery (unbounded per-subscriber channels)
-- Multiple concurrent subscribers per channel, each with independent backpressure
+- Subscribe with zero-message-loss delivery
 - Presence: enter, leave, update, get members, subscribe to presence events
-- Presence sync protocol with newness comparison and residual leave detection
 - Automatic member re-enter on non-resumed re-attach (RTP17i)
 - Connection resume with `connectionKey` and `connectionSerial`
 - Connection state freshness check (`connectionStateTtl + maxIdleInterval`)
@@ -34,21 +31,13 @@ This is a community-maintained fork of the original [ably-rust](https://github.c
 - Ping/pong RTT measurement
 - JSON and MessagePack wire protocols
 
-### Design Decisions
-- **Server-side, API-key auth only.** No token refresh, no `authCallback`/`authUrl` on WebSocket, no browser transports.
-- **Zero message loss by default.** All subscriber delivery uses unbounded `mpsc` fan-out. Applications that need guaranteed delivery should also monitor `channel.on_discontinuity()` and backfill from the history API when fired.
-- **No polling.** All state tracking uses `tokio::sync::watch` for race-free, immediate reads. State waits use `watch::Receiver::wait_for()`, not sleep loops.
-- **Idiomatic async Rust.** Built on `tokio` with `tokio-tungstenite` for WebSocket transport.
-
-## Installation
-
-Add `reliably` and `tokio` to your `Cargo.toml`:
-
-```toml
-[dependencies]
-reliably = "0.3.0"
-tokio = { version = "1", features = ["full"] }
-```
+### REST API
+- Publish messages (string, JSON, binary)
+- Retrieve message history with pagination
+- Presence: get current members, history
+- Token authentication (request tokens, sign token requests)
+- Application statistics
+- Message encryption (AES-128/AES-256)
 
 ## Using the Realtime API
 
@@ -100,7 +89,7 @@ if let Some(msg) = sub.recv().await {
 
 ### Multiple Subscribers
 
-Each subscriber gets its own independent unbounded stream. No message drops regardless of subscriber speed.
+Each subscriber gets its own independent unbounded stream.
 
 ```rust
 let mut sub1 = channel.subscribe().await?;
@@ -328,7 +317,6 @@ src/
 - **Delta compression** -- No vcdiff delta decoding.
 - **LiveObjects, Annotations, message interactions** -- Not in scope.
 - **Filtered subscriptions** -- Not implemented.
-- **Browser-specific concerns** -- Server-side only.
 
 ## Testing
 
@@ -337,11 +325,6 @@ Tests run against the Ably sandbox environment:
 ```sh
 cargo test
 ```
-
-The test suite includes 59 integration tests (40 REST + 19 Realtime) and 13 doctests:
-
-- REST: publish, history, presence, auth, tokens, stats, encryption, fallback hosts
-- Realtime: connect, close, ping, channel attach/detach, publish/subscribe (string, JSON, binary), multiple subscribers, high-throughput ordered delivery, two-client cross-connection pub/sub, auto-attach on subscribe, channel state changes, presence enter/leave/update/get with multiple clients, discontinuity detection
 
 ## License
 
