@@ -2,13 +2,18 @@
 name = "reliably"
 version = "0.3.4"
 edition = "2021"
-description = "A fully-featured real-time Rust client for Ably"
+description = "A fully-featured real-time Rust SDK for Ably real-time messaging"
 documentation = "https://docs.rs/reliably"
 readme = "README.md"
 repository = "https://github.com/Ogyeet10/reliably"
 license = "Apache-2.0"
-keywords = ["ably", "reliably", "realtime", "pubsub"]
-
+keywords = ["ably", "realtime", "pubsub", "websocket", "sdk"]
+categories = [
+    "api-bindings",
+    "network-programming",
+    "web-programming::websocket",
+    "asynchronous"
+]
 include = [
   "Cargo.toml",
   "LICENSE",
